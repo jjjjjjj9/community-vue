@@ -1,0 +1,255 @@
+<template>
+    <div>
+      <el-card class="box-card box-cards">
+        <el-row>
+          <el-form :inline="true" class="user-search">
+            <el-col :span="24">
+              <el-form-item>
+                <div class="card_top"><span>志愿者管理</span></div>
+              </el-form-item>
+              <el-form-item label="搜索：">
+                <el-input size="small" v-model="formInline.name" placeholder="输入姓名"></el-input>
+              </el-form-item>
+              <el-form-item>
+                <el-button size="small" type="goon" icon="el-icon-search" @click="search">搜索</el-button>
+              </el-form-item>
+            </el-col>
+          </el-form>
+        </el-row>
+      </el-card>
+      <el-card class="box-card box-cards2">
+        <!--列表-->
+        <el-table border ref="multipleTable" :data="tableData" :header-cell-style="headStyle" tooltip-effect="dark" style="width: 100%; "
+          v-loading="loading">
+          <el-table-column align="center" type="index" label="序号" width="80"></el-table-column>
+          <el-table-column prop="ioc" label="形象照" align="center" width="100">
+           <template slot-scope="scope">
+            <img :src="scope.row.ioc" alt="" style="border-radius: 50%;width:40px; height: 40px;">
+           </template>
+        </el-table-column>
+          <el-table-column prop="name" label="姓名" align="center"  width="100"></el-table-column>
+          <el-table-column prop="sex" label="性别" align="center"  width="80">
+          <template slot-scope="scope">
+            <div>{{ scope.row.sex == 1 ? "男" : scope.row.sex == 2 ? "女" : "未知"  }}</div>
+          </template>
+        </el-table-column>
+          <el-table-column prop="phone" label="联系电话" align="center"  width="160"></el-table-column>
+          <el-table-column prop="face" label="政治面貌" align="center"  width="120"></el-table-column>
+          <el-table-column prop="dw" label="工作单位" align="center"  width="160"></el-table-column>
+          <el-table-column prop="address" label="家庭住址" align="center"  width="160"></el-table-column>
+          <el-table-column prop="lx" label="服务类型" align="center"  width="140"></el-table-column>
+          <el-table-column prop="aname" label="服务时间" align="center"  width="250"></el-table-column>
+          <el-table-column prop="aid" label="总获赞数" align="center"  width="120"></el-table-column>
+          <el-table-column prop="aixin" label="本月获赞数" align="center"  width="150"></el-table-column>
+
+          <el-table-column prop="enable" label="状态" align="center"  width="80">
+            <template slot-scope="scope">
+              <div>{{scope.row.status==1?"通过":scope.row.status==2?"不通过":"待审核"}}</div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="ctime" label="申请时间" align="center"  width="160">
+            <template slot-scope="scope">
+              <div>{{scope.row.ctime | timestampToTime}}</div>
+            </template>
+          </el-table-column>
+  
+          <el-table-column align="center" label="操作" width="250" fixed="right">
+            <template slot-scope="scope">
+              <el-button size="mini" type="primary" v-if="scope.row.status==0" @click="handleEdit(scope.$index, scope.row,1)">通过</el-button>
+              <el-button size="mini" type="warning" v-if="scope.row.status==0" @click="handleEdit(scope.$index, scope.row,2)">驳回</el-button>
+
+              <el-button size="mini" type="danger" @click="handleEditdel(scope.$index, scope.row)">删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <!-- 分页组件 -->
+        <Pagination v-bind:child-msg="pageparm" @callFather="callFather"></Pagination>
+      </el-card>
+  
+    </div>
+  </template>
+  <script>
+  import Pagination from "../../components/Pagination";
+  import { imgsrc } from "../../utils/utils";
+  import debounce from "../../utils/debounce";
+  import { VolunteerList,shenhe, VolunteerDel } from "../../api/userMG";
+  export default {
+    data() {
+      return {
+        optionslist: [{
+                value: 0,
+                label: '不启用'
+                }, {
+                value: 1,
+                label: '启用'
+            }],
+        title: "",
+        loading: false,
+        loading2: false,
+        editFormVisible: false,
+        dialogVisiblevideo: false,//查看视频
+        //分页
+        pageparm: {
+          currentPage: 1,
+          pageSize: 10,
+          total: 10,
+        },
+        imgsrc: "", //图片
+        tableData: [], //表格数据
+        formInline: {
+          name: '',
+          page: 1,
+          limit: 10
+        },
+        //添加，修改数据
+        editForm: {
+          id: 0,
+          name: "",
+          enable: 0,
+          username: "",
+         
+          remarks: ""
+        },
+        //规则验证
+        rules: {},
+      };
+    },
+    components: {
+      Pagination
+    },
+    created() {
+      this.imgsrc = imgsrc;//上传地址
+      //数据列表
+      this.getlist(this.formInline);
+    },
+    methods: {
+      headStyle() {
+        return {
+          background: "#A1BBFF",
+          color: "#fff",
+          letterSpacing: "10px",
+          border: " 1px solid #A1BBFF",
+          textAlign: "center",
+          height: "39px",
+        };
+      },
+      //显示数据
+      getlist(parameter) {
+        this.loading = true;
+        VolunteerList(parameter)
+          .then((res) => {
+            this.loading = false;
+            // console.log("userlist", res);
+            if (res.code != 200) {
+              this.$message({
+                type: "info",
+                message: res.msg,
+              });
+            } else {
+              this.tableData = res.data;
+              // 分页赋值
+              this.pageparm.currentPage = this.formInline.page;
+              this.pageparm.pageSize = this.formInline.limit;
+              this.pageparm.total = res.maxPage;
+              // console.log(this.tableData)
+            }
+          })
+          .catch((err) => {
+            this.loading = false;
+            this.$message.error("加载失败，请稍后再试！");
+          });
+      },
+      // 分页插件事件
+      callFather(parm) {
+        this.formInline.page = parm.currentPage;
+        this.formInline.limit = parm.pageSize;
+        this.getlist(this.formInline);
+      },
+      // 搜索事件
+      search() {
+        this.formInline.page = 1;
+        this.getlist(this.formInline); //显示
+      },
+     
+  
+     
+      //删除
+      handleEditdel(index, row) {
+        this.$confirm("确定要删除吗?", "信息", {
+          confirmButtonText: "确定",
+          cancelButtonText: "取消",
+          type: "warning",
+        })
+          .then(() => {
+            VolunteerDel({ id: row.id }) //删除
+              .then((res) => {
+                // console.log("d", res);
+                if (res.code == 200) {
+                  this.$message({
+                    type: "success",
+                    message: "删除成功!",
+                  });
+                  this.getlist(this.formInline);
+                } else {
+                  this.$message({
+                    type: "info",
+                    message: res.msg,
+                  });
+                }
+              })
+              .catch((err) => {
+                this.loading = false;
+                this.$message.error("删除失败，请稍后再试！");
+              });
+          })
+          .catch(() => {
+            this.$message({
+              type: "info",
+              message: "已取消",
+            });
+          });
+      },
+      handleEdit(index, row,e) {
+        this.$confirm("确定要更变志愿者状态吗?", "信息", {
+          confirmButtonText: "确定",
+          cancelButtonText: "取消",
+          type: "warning",
+        })
+          .then(() => {
+            shenhe({ id: row.id,status:e }) //删除
+              .then((res) => {
+                // console.log("d", res);
+                if (res.code == 200) {
+                  this.$message({
+                    type: "success",
+                    message: "更变成功!",
+                  });
+                  this.getlist(this.formInline);
+                } else {
+                  this.$message({
+                    type: "info",
+                    message: res.msg,
+                  });
+                }
+              })
+              .catch((err) => {
+                this.loading = false;
+                this.$message.error("更变失败，请稍后再试！");
+              });
+          })
+          .catch(() => {
+            this.$message({
+              type: "info",
+              message: "已取消",
+            });
+          });
+      }
+  
+    },
+  };
+  </script>
+  <style>
+  @import "../../assets/css/index.css";
+  
+  </style>
